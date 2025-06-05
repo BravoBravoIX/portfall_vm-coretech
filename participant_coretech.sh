@@ -7,7 +7,7 @@ set -e
 
 LOG_FILE="/var/log/sim/ais_feed.log"
 CRON_FILE="/etc/cron.d/truncate_ais"
-TRAP_SCRIPT="/opt/tools/restore_feed.sh"
+TRAP_SCRIPT="/home/ubuntu/restore_feed.sh"
 REFERENCE_LOG="/opt/reference/ais_reference.log"
 FAKE_SERVICE="ais-feed.service"
 FAKE_LOG="/var/log/fake_services/ais.log"
