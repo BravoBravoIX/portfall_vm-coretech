@@ -1,84 +1,113 @@
-**VM Build Sheet: vm-coretech**
+VM Build Sheet: vm-coretech
 
-**Purpose:**
-Simulates the backend for AIS tracking and route planning system. Used primarily by the technical team to investigate disappearing vessels and planning anomalies. This VM will simulate GPS jamming impacts and log tampering without allowing participants to resolve the core issue.
+Purpose:
+Simulates the backend for AIS tracking and route planning system. Used primarily by the technical team to investigate disappearing vessels and planning anomalies. This VM simulates GPS jamming impacts, fake system recovery attempts, and log tampering. Participants cannot fully resolve the core issue, but are expected to detect and report the anomalies.
 
----
+1. Services and Software to Install
+gpsd (simulates GPS stream interference)
 
-### 1. Services and Software to Install
+cron (used to truncate or delete logs maliciously)
 
-* `gpsd` (daemon to simulate GPS stream loss)
-* `cron` (to schedule malicious cleanup jobs)
-* `rsyslog` (for general logging)
-* Standard Linux CLI tools: `grep`, `sha256sum`, `scp`, `vim`, `net-tools`, `htop`
+rsyslog (logging framework)
 
-### 2. Directory and File Structure
+systemd fake service: ais-feed.service (appears to be key process, but is meaningless)
 
-```bash
+Standard CLI tools: grep, sha256sum, scp, vim, net-tools, htop
+
+2. Directory and File Structure
+bash
+Copy
+Edit
 /var/log/sim/
-  └── ais_feed.log         # Simulated AIS data with anomalies (timestamp issues, gaps)
-/etc/cron.d/
-  └── wipe_ais             # Cron job that deletes logs every 5 mins
-/opt/tools/
-  └── restore_feed.sh      # Dummy script that appears to fix AIS feed but does nothing
+  └── ais_feed.log           # Simulated AIS data with anomalies and degraded signals
 /opt/reference/
-  └── ais_reference.log    # A clean log used for comparisons (different from live feed)
-```
+  └── ais_reference.log      # A clean AIS log used for integrity comparison
+/opt/tools/
+  └── restore_feed.sh        # Fake script pretending to fix AIS feed
+/etc/systemd/system/
+  └── ais-feed.service       # Dummy service used to mislead participants
+/etc/cron.d/
+  └── truncate_ais           # Cron job that zeroes logs silently every 5 mins
+3. Log Content Details
+ais_feed.log reflects:
 
-### 3. Log Content Details
+Early GPS signal issues (e.g. "GPS fix lost", "Signal degraded")
 
-* `ais_feed.log` should show a normal feed at first, with:
+Periodic entries like "Feed restarting..." that mimic attempted recovery
 
-  * 1 ship vanishing early (T+5 mins)
-  * 2–3 more ships missing after T+15
-  * Inject subtle timestamp discrepancies (e.g. entries logged 10 minutes before system time)
-  * Error entries like `GPS fix lost`, `Signal degraded`, `Restarting feed...`
+Gaps in ship reporting
 
-### 4. Cron Job (Malicious)
+Timestamp discrepancies (e.g. delayed logs)
 
-* File: `/etc/cron.d/wipe_ais`
-* Content:
+4. Cron Job (Silent Log Wipe)
+File: /etc/cron.d/truncate_ais
 
-```bash
-*/5 * * * * root rm -f /var/log/sim/ais_feed.log
-```
+Function: Truncates log file every 5 minutes
 
-* Purpose: Makes logs disappear gradually — participants may spot this and disable it
+bash
+Copy
+Edit
+*/5 * * * * root truncate -s 0 /var/log/sim/ais_feed.log
+Participants may investigate and remove this to stop tampering — it will not fix the root issue
 
-### 5. Trap Script (Red Herring)
+5. Fake Recovery Script (Trap)
+File: /opt/tools/restore_feed.sh
 
-* File: `/opt/tools/restore_feed.sh`
-* Permissions: Executable by all
-* Behaviour: Echoes success message, exits cleanly, but does nothing
-* Purpose: False confidence — tests critical thinking
-* If they open script, there's a commented message "You really thought it would be that easy? lol"
+Executable: Yes, available immediately
 
-### 6. Expected Participant Actions
+Behaviour: Prints success message but does nothing
 
-* SSH into VM and use `journalctl`, `grep`, `tail`, `sha256sum`
-* Investigate why ships are disappearing
-* Try restarting services or deleting the cron job
-* Attempt to copy logs to `vm-audit`
+Hidden Message: Contains line "You really thought it would be that easy? lol"
 
-### 7. Outcomes
+Purpose: Appears helpful but misleads — triggers false confidence
 
-* Restarting `gpsd` or removing cron job has no effect
-* Logs appear to regenerate but show increasing gaps
-* Ultimately, they must escalate and submit logs
+6. Dummy Service (Fake Systemd)
+File: /etc/systemd/system/ais-feed.service
 
-### 8. Inject Linkages
+Simulates critical process — participants may attempt:
 
-* INJ001 (Ship disappearance begins)
-* INJ007 (Multiple ships vanish)
-* INJ010 (Corrupted planner logic)
-* INJ013A (Request for logs and hash from audit)
+systemctl restart ais-feed
 
-### 9. Scoring Hooks
+journalctl -u ais-feed
 
-* Did they identify the log manipulation?
-* Did they act without destroying evidence?
-* Did they submit tampered logs with disclosure?
-* Did they escalate GPS jamming suspicion appropriately?
+Service runs but is meaningless — used to simulate complexity and distract
 
----
+7. Expected Participant Actions
+Login and immediately notice restore_feed.sh — may run it prematurely
 
+Use tail, grep, or journalctl to examine logs and services
+
+Discover the cron job truncating logs and possibly disable it
+
+Attempt to hash and transfer logs to vm-audit
+
+Eventually realise logs are compromised and escalate accordingly
+
+8. Outcomes
+Restarting gpsd or ais-feed.service has no meaningful impact
+
+Cron continues truncating logs unless stopped
+
+Logs continue showing incomplete or suspicious AIS activity
+
+Participant success depends on forensic documentation, not technical restoration
+
+9. Inject Linkages
+INJ001 – Initial disappearance of Ship Alpha
+
+INJ007 – Multi-ship AIS blackout
+
+INJ010 – Conflict in route planner logic (reflected in corrupted entries)
+
+INJ013A – Official request for log submission and hashes
+
+10. Scoring Hooks
+Did the team fall for the trap script and recover from it?
+
+Did they detect and explain the impact of the cron job?
+
+Did they hash and submit logs properly despite truncation?
+
+Did they flag GPS interference as a likely vector?
+
+Did they preserve logs for legal/forensics or destroy evidence?
