@@ -65,12 +65,11 @@ function create_trap_script() {
 #!/bin/bash
 echo "[+] Attempting to restore AIS feed..."
 echo "Feed connection restored."
-# You really thought it would be that easy? lol
+sleep 1
+echo "[H4x0r] Nice try... maybe don't trust everything in /home ;)"
 exit 0
 EOF
   chmod +x /home/ubuntu/restore_feed.sh
-
-  # Add note to .bashrc to make them curious
   echo 'echo "[info] You may want to try restore_feed.sh if AIS is misbehaving..."' >> /home/ubuntu/.bashrc
 }
 
