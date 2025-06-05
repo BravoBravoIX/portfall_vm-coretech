@@ -1,6 +1,7 @@
 #!/bin/bash
 
 SETUP_FLAG="/opt/setup_complete.flag"
+FAKE_SERVICE="/etc/systemd/system/ais-feed.service"
 
 function install_packages() {
   echo "[+] Installing required packages..."
@@ -13,6 +14,7 @@ function create_directories() {
   mkdir -p /var/log/sim
   mkdir -p /opt/tools
   mkdir -p /opt/reference
+  mkdir -p /var/log/fake_services
 }
 
 function create_logs() {
@@ -58,15 +60,41 @@ EOF
 }
 
 function create_trap_script() {
-  echo "[+] Creating fake restore_feed.sh..."
-  cat > /opt/tools/restore_feed.sh <<EOF
+  echo "[+] Creating visible fake restore_feed.sh in home directory..."
+  cat > /home/ubuntu/restore_feed.sh <<EOF
 #!/bin/bash
 echo "[+] Attempting to restore AIS feed..."
 echo "Feed connection restored."
 # You really thought it would be that easy? lol
 exit 0
 EOF
-  chmod +x /opt/tools/restore_feed.sh
+  chmod +x /home/ubuntu/restore_feed.sh
+
+  # Add note to .bashrc to make them curious
+  echo 'echo "[info] You may want to try restore_feed.sh if AIS is misbehaving..."' >> /home/ubuntu/.bashrc
+}
+
+function create_fake_service() {
+  echo "[+] Installing fake AIS feed service..."
+  cat > "$FAKE_SERVICE" <<EOF
+[Unit]
+Description=AIS Feed Simulator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'while true; do echo "\$(date -u) restarting AIS feed..." >> /var/log/fake_services/ais.log; sleep 60; done'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  chmod 644 "$FAKE_SERVICE"
+  systemctl daemon-reexec
+  systemctl daemon-reload
+  systemctl enable ais-feed.service
+  systemctl start ais-feed.service
 }
 
 function mark_complete() {
@@ -78,8 +106,13 @@ function reset_vm() {
   echo "[!] Resetting vm-coretech to pre-scenario state..."
   rm -f /var/log/sim/ais_feed.log
   rm -f /etc/cron.d/truncate_ais
-  rm -rf /opt/tools/restore_feed.sh
-  rm -rf /opt/reference/ais_reference.log
+  rm -f /opt/reference/ais_reference.log
+  rm -f /home/ubuntu/restore_feed.sh
+  sed -i '/restore_feed.sh/d' /home/ubuntu/.bashrc
+  systemctl stop ais-feed.service 2>/dev/null || true
+  systemctl disable ais-feed.service 2>/dev/null || true
+  rm -f "$FAKE_SERVICE"
+  rm -rf /var/log/fake_services/
   rm -f "$SETUP_FLAG"
   echo "[+] Reset complete."
   exit 0
@@ -99,6 +132,7 @@ create_directories
 create_logs
 create_cron_job
 create_trap_script
+create_fake_service
 mark_complete
 
 echo "[✓] vm-coretech setup complete. Ready for scenario."
